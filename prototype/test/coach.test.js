@@ -18,7 +18,7 @@ function perfectTrack(target, offset) {
 
 test('every phrase has a pitch spec for every syllable at every level', () => {
   for (const p of K.PHRASES) {
-    for (const lvl of ['simple', 'hijaz']) {
+    for (const lvl of ['simple']) {
       assert.equal(p[lvl].length, p.syl.length, `${p.id} ${lvl}`);
       p.syl.forEach(([s], k) => {
         if (s === '|') assert.equal(p[lvl][k], null, `${p.id} ${lvl} rest ${k}`);
@@ -31,7 +31,7 @@ test('every phrase has a pitch spec for every syllable at every level', () => {
 
 test('patterns stay inside a safe range above the home note', () => {
   for (const p of K.PHRASES) {
-    for (const lvl of ['steady', 'simple', 'hijaz']) {
+    for (const lvl of ['steady', 'simple']) {
       const t = C.buildTarget(p, lvl);
       const vals = Array.from(t.cents).filter((c) => !Number.isNaN(c));
       assert.ok(Math.min(...vals) >= 0 && Math.max(...vals) <= 700, `${p.id} ${lvl}`);
@@ -56,11 +56,11 @@ test('buildTarget: steady level is a single note with the pair rest', () => {
 });
 
 test('buildTarget: glides interpolate between breakpoints', () => {
-  const t = C.buildTarget(phrase('takbir-open'), 'hijaz');
-  // "lā" starts at 0.35 s, rises to 400 by 35% of its 1.1 s.
-  assert.ok(Math.abs(C.targetAt(t, 0.35 + 1.1 * 0.8) - 400) < 1);
+  const t = C.buildTarget(phrase('takbir-open'), 'simple');
+  // "lā" starts at 0.35 s and rises to 200 by 30% of its 1.1 s.
+  assert.ok(Math.abs(C.targetAt(t, 0.35 + 1.1 * 0.8) - 200) < 1);
   const early = C.targetAt(t, 0.35 + 1.1 * 0.1);
-  assert.ok(early > 0 && early < 100);
+  assert.ok(early > 0 && early < 200);
 });
 
 test('a perfect take is in band and gets warm feedback', () => {
@@ -73,7 +73,7 @@ test('a perfect take is in band and gets warm feedback', () => {
 });
 
 test('an octave-up take counts as on the pattern', () => {
-  const t = C.buildTarget(phrase('hayya-salah'), 'hijaz');
+  const t = C.buildTarget(phrase('hayya-salah'), 'simple');
   const a = C.analyzeTake(t, perfectTrack(t, 1200), { tol: 40 });
   assert.ok(a.inBand > 0.98);
 });
@@ -124,6 +124,21 @@ test('buildSequence chains lines with breathing gaps', () => {
   assert.ok(Math.abs(seq.dur - (sum + 2.5 * 11)) < 1e-6);
   assert.equal(seq.parts.length, 12);
   assert.equal(seq.breaths.length, 11);
+  // Each line starts after the previous line plus one breath.
+  assert.equal(seq.starts.length, 12);
+  assert.equal(seq.starts[0], 0);
+  assert.ok(Math.abs(seq.starts[1] - (items[0].target.dur + 2.5)) < 1e-9);
+});
+
+test('targetFromCents reads a stored contour with silences', () => {
+  const stored = [null, null, 0, 10, 20, 400, 400, null];
+  const t = C.targetFromCents(stored);
+  assert.ok(Number.isNaN(C.targetAt(t, 0)));
+  assert.equal(C.targetAt(t, 0.03), 10);
+  assert.equal(C.targetAt(t, 0.05), 400);
+  assert.ok(Math.abs(t.firstVoiced - 0.02) < 1e-9);
+  assert.ok(Math.abs(t.dur - 0.07) < 1e-9);
+  assert.equal(C.targetFromCents(stored, -100).cents[5], 300);
 });
 
 test('targetFromContour transposes a recording to the home note', () => {

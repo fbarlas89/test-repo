@@ -125,7 +125,11 @@ A zero-dependency web app. It runs live in a phone browser when hosted, and work
 - **Intention:** a rotating reminder with its source.
 - **Home note:** hold "Allāh" for three seconds, or choose by ear. Every pattern then fits that note.
 - **Seven lines of the adhan** (eight at Fajr), each with Arabic, transliteration, meaning, pronunciation tips and a breath note.
-- **Three levels:** Steady note, Simple melody, Hijaz pattern (illustrative).
+- **Levels:**
+  - Steady note and Simple melody, each with a hummed guide.
+  - **Recorded adhan:** a real muezzin, line by line, with the ribbon traced from the same voice.
+  - **My recording:** an adhan you upload.
+- **Original pitch / At my note:** on recorded voices, hear the muezzin as sung, or moved to your home note with the timing unchanged.
 - **A live pitch lane:**
   - a gold ribbon for the pattern, with a tolerance band
   - your voice as a green (on) or orange (off) line

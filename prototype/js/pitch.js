@@ -233,12 +233,30 @@
   }
 
   /**
-   * Estimate the "home" note of a recording: a robust low note of the
-   * melody, which is where maqam phrases tend to come to rest.
+   * Estimate the "home" note of a recording: the lowest note the melody
+   * keeps returning to, which is where maqam phrases come to rest. In
+   * practice, the lowest 75-cent region holding at least 4% of the
+   * singing, so passing low notes and glides don't count.
    */
   function estimateTonic(frames) {
-    const hz = frames.filter((f) => f.hz != null).map((f) => f.hz);
-    return percentile(hz, 15);
+    const ref = 100;
+    const cents = frames.filter((f) => f.hz != null).map((f) => hzToCents(f.hz, ref));
+    if (!cents.length) return null;
+    const bins = new Map();
+    for (const c of cents) {
+      const b = Math.round(c / 25);
+      bins.set(b, (bins.get(b) || 0) + 1);
+    }
+    const need = cents.length * 0.04;
+    const keys = [...bins.keys()].sort((a, b) => a - b);
+    for (const k of keys) {
+      const mass = (bins.get(k - 1) || 0) + bins.get(k) + (bins.get(k + 1) || 0);
+      if (mass >= need) {
+        const near = cents.filter((c) => Math.abs(c / 25 - k) <= 1.5);
+        return centsToHz(median(near), ref);
+      }
+    }
+    return centsToHz(median(cents), ref);
   }
 
   return {

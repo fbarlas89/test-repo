@@ -3,8 +3,9 @@
  *
  * DRAFT CONTENT. Every pronunciation note, reminder and citation here must
  * be reviewed by a qualified teacher/scholar before any release. The
- * melodies are illustrative practice patterns written for this prototype;
- * they are not transcriptions of any muezzin.
+ * Steady and Simple melodies are practice scaffolds written for this
+ * prototype and are played as a hum. Real melodies come from a recorded
+ * muezzin (see reference/ and tools/prepare-reference.js).
  *
  * Pitch is always in cents relative to the user's own home note (0), so
  * every pattern fits every voice.
@@ -25,7 +26,7 @@
       id: 'steady',
       name: 'One steady note',
       short: 'Steady',
-      about: 'Words, timing and breath on your home note. Get the letters right first.',
+      about: 'A hummed guide on your home note, for words, timing and breath. Get the letters right first.',
       degrees: [0],
       labels: ['1'],
     },
@@ -33,17 +34,18 @@
       id: 'simple',
       name: 'Simple melody',
       short: 'Simple',
-      about: 'A gentle shape within three steps of your home note.',
+      about: 'A hummed guide to a gentle shape within three steps of your home note. No words: say them yourself.',
       degrees: [0, 200, 300, 500],
       labels: ['1', '2', '♭3', '4'],
     },
     {
-      id: 'hijaz',
-      name: 'Hijaz pattern',
-      short: 'Hijaz',
-      about: 'An illustrative pattern on the Hijaz jins (1, ♭2, 3, 4), a sound many people know from the Haramain.',
-      degrees: [0, 100, 400, 500, 700],
-      labels: ['1', '♭2', '3', '4', '5'],
+      id: 'rec',
+      name: 'Recorded adhan',
+      short: 'Recorded',
+      about: 'A real muezzin\'s voice. Listen to the words and melody, then follow the ribbon traced from the same recording.',
+      degrees: [0],
+      labels: ['1'],
+      recorded: true,
     },
   ];
 
@@ -57,11 +59,6 @@
       0, g([0, 0], [0.3, 200], [1, 200]), 200, 300, g([0, 200], [0.55, 200], [1, 0]),
       null,
       0, g([0, 200], [0.3, 300], [1, 300]), 200, 200, g([0, 200], [0.5, 200], [1, 0]),
-    ],
-    hijaz: [
-      0, g([0, 0], [0.15, 100], [0.35, 400], [1, 400]), 400, 500, g([0, 400], [0.4, 400], [0.7, 100], [1, 0]),
-      null,
-      0, g([0, 400], [0.25, 500], [0.6, 500], [0.75, 400], [1, 500]), 400, 400, g([0, 400], [0.35, 100], [1, 0]),
     ],
   };
 
@@ -102,10 +99,6 @@
         0, 0, 200, 200, g([0, 200], [0.3, 300], [1, 300]),
         200, 200, 200, 200, g([0, 300], [1, 200]), g([0, 200], [0.5, 200], [1, 0]),
       ],
-      hijaz: [
-        0, 100, 400, 400, g([0, 400], [0.3, 500], [1, 500]),
-        400, 400, 100, 100, g([0, 400], [0.4, 500], [1, 400]), g([0, 100], [0.5, 100], [1, 0]),
-      ],
     },
     {
       id: 'shahada-2',
@@ -128,10 +121,6 @@
         0, 0, 200, 200, 200, 300, 300, 200, 200, 200, g([0, 200], [0.3, 300], [1, 300]), 200,
         g([0, 200], [0.5, 200], [1, 0]),
       ],
-      hijaz: [
-        0, 100, 400, 400, 400, 500, 500, 400, 400, 400, g([0, 500], [0.3, 700], [0.7, 700], [1, 500]), 400,
-        g([0, 100], [0.5, 100], [1, 0]),
-      ],
     },
     {
       id: 'hayya-salah',
@@ -148,7 +137,6 @@
       breath: 'Short line: breathe, then let the last word bloom.',
       syl: [['Ḥay', 0.45], ['ya', 0.6], ['ʿa', 0.3], ['laṣ', 0.4], ['ṣa', 0.4], ['lāh', 1.8]],
       simple: [200, 300, 200, 200, 200, g([0, 300], [0.4, 300], [0.7, 200], [1, 0])],
-      hijaz: [400, 500, 400, 400, 400, g([0, 500], [0.35, 500], [0.6, 400], [0.8, 100], [1, 0])],
     },
     {
       id: 'hayya-falah',
@@ -164,7 +152,6 @@
       breath: 'Breathe, then carry the long "lā" all the way to the ḥ.',
       syl: [['Ḥay', 0.45], ['ya', 0.6], ['ʿa', 0.3], ['lal', 0.4], ['fa', 0.4], ['lāḥ', 1.8]],
       simple: [200, 300, 300, 200, 200, g([0, 200], [0.5, 200], [1, 0])],
-      hijaz: [400, 500, 500, 400, 400, g([0, 400], [0.4, 400], [0.7, 100], [1, 0])],
     },
     {
       id: 'fajr',
@@ -184,7 +171,6 @@
         ['mi', 0.3], ['nan', 0.4], ['nawm', 1.6],
       ],
       simple: [0, 200, 300, 200, 300, 200, 200, 200, g([0, 200], [0.5, 200], [1, 0])],
-      hijaz: [0, 100, g([0, 400], [1, 500]), 400, 500, 400, 400, 100, g([0, 100], [0.5, 100], [1, 0])],
     },
     {
       id: 'takbir-close',
@@ -214,7 +200,6 @@
       breath: 'A full breath. This line comes to rest.',
       syl: [['Lā', 1.2], ['i', 0.3], ['lā', 0.4], ['ha', 0.35], ['il', 0.35], ['lā', 1.0], ['llāh', 1.6]],
       simple: [g([0, 200], [0.3, 300], [1, 300]), 200, 200, 200, 200, 200, g([0, 200], [0.5, 200], [1, 0])],
-      hijaz: [g([0, 400], [0.3, 500], [1, 500]), 400, 400, 100, 100, 100, g([0, 100], [0.5, 100], [1, 0])],
     },
   ];
 

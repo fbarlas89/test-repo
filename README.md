@@ -31,7 +31,11 @@ Wear headphones if you want to hear yourself live with reverb.
 | 4. Close | Qurʾān 2:127, a real-world next step, a private "did you give a real adhan?" check-in, and the duʿāʾ after the adhan. |
 
 **Practice options:**
-- **Levels:** Steady note, Simple melody, Hijaz pattern (illustrative), or My recording.
+- **Levels:**
+  - **Steady** and **Simple** play a hummed guide to the melody. There are no words; you say them.
+  - **Recorded** plays a real muezzin, line by line, with the ribbon traced from the same voice. It needs a recording to be added (see below).
+  - **My recording** does the same with an adhan you upload.
+- **Original pitch / At my note:** on the two recorded levels, hear the voice as sung, or moved to your home note (by the nearest octave, never more than 6 semitones) with its timing unchanged.
 - **Band:** Gentle, Normal or Precise, which sets how close counts as on the pattern.
 - **Spaces:** Dry, Home, Musallā, Masjid or Grand dome, with adjustable reverb and echo.
 - **Learn from a recording:** upload an adhan you have the right to use. Hayya traces its melody, splits it into lines and moves it to your note.
@@ -48,7 +52,10 @@ mic ─▶ YIN pitch detector (dry signal, ~16 kHz) ─▶ cents from your home 
 - `js/pitch.js`: YIN pitch detection, smoothing, cents maths, offline contour extraction, phrase segmentation.
 - `js/content.js`: the adhan lines, pronunciation notes, reminders, illustrative patterns (draft content).
 - `js/coach.js`: builds target contours, compares takes, and writes feedback in words.
-- `js/audio.js`: Web Audio graph (convolution reverb, feedback echo, limiter), guide voice synth, microphone, recording.
+- `js/audio.js`: Web Audio graph (convolution reverb, feedback echo, limiter), hummed guide synth, microphone, recording.
+- `js/shift.js`: pitch shifter that keeps timing (WSOLA time-stretch plus resampling), used for "At my note".
+- `js/reference.js`: loads the prepared recording and serves each line, as recorded or moved to your note.
+- `tools/prepare-reference.js`: turns any adhan recording into per-line clips and a traced melody.
 - `js/viz.js`: the pitch-lane canvas.
 - `js/app.js`: screen flow and state.
 
@@ -58,9 +65,36 @@ There are no dependencies and no build step. Preferences are kept in `localStora
 
 ```sh
 cd prototype
-npm test                 # 27 unit tests: pitch accuracy, coach logic, content integrity
+npm test                 # 39 unit tests: pitch accuracy, pitch shifting, coach logic, recording prep, content
 npm run check:browser    # end-to-end in Chromium with a fake microphone (needs Playwright)
 ```
+
+## Adding the real adhan recording
+
+The **Recorded** level stays off until `prototype/reference/` holds a prepared recording. Preparing one is a single command. It works the same for a free recording now and a teacher's recording later.
+
+```sh
+cd prototype
+# 1. Get a recording you have the right to use, e.g. the public-domain (CC0) one on Wikimedia Commons:
+curl -L -o beautiful-adhan.ogg "https://commons.wikimedia.org/wiki/Special:FilePath/Beautiful_adhan.ogg"
+
+# 2. Split it into lines, trace the melody, and write reference/ (needs Playwright)
+node tools/prepare-reference.js beautiful-adhan.ogg \
+  --title "Beautiful adhan" --credit "Wikimedia Commons" --license "CC0 1.0" \
+  --source "https://commons.wikimedia.org/wiki/File:Beautiful_adhan.ogg"
+```
+
+The script:
+- prints one row per line, with its start time and length
+- writes one clip per line plus `reference/manifest.json`, which holds the credit, the licence, the recording's home note and each line's traced melody.
+
+**Check the result by ear.** Play each line in the app. If a line is split wrongly, re-run with `--segments "start-end,start-end,..."`, giving seconds for each of the 12 lines. Add `--fajr` if the recording includes *aṣ-ṣalātu khayrun mina-n-nawm*.
+
+**Recording a teacher or muezzin.** These make the line splitting and pitch tracing work best:
+- a quiet room, with the phone about 30 cm away
+- no added reverb or echo, because Hayya adds the room
+- a clear pause between lines
+- one full adhan, plus the Fajr line separately if wanted
 
 ## Content status
 

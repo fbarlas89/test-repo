@@ -7,7 +7,7 @@
  */
 (function () {
   'use strict';
-  const { pitch: P, coach: C, content: K, audio: A, viz: V } = window.Hayya;
+  const { pitch: P, coach: C, content: K, audio: A, viz: V, reference: R } = window.Hayya;
   const $ = (id) => document.getElementById(id);
   const BASE_HZ = 130.81; // C3, the default home note
 
@@ -44,11 +44,16 @@
     full: false,
     micState: A.Engine.micPossible() ? 'unknown' : 'blocked',
     target: null,
+    items: null,
     take: null,
     ref: null,
+    rec: null,
+    pitchMode: store.get('pitchMode', 'original'),
     run: null,
   };
-  if (state.level === 'ref') state.level = 'simple';
+  // "Recorded" waits for the recording to load; older sessions may have "hijaz".
+  const wantedLevel = state.level;
+  if (!['steady', 'simple'].includes(state.level)) state.level = 'simple';
 
   const engine = new A.Engine();
   engine.space = Object.assign({}, A.SPACES[state.spaceId] || A.SPACES.masjid);
@@ -195,20 +200,30 @@
     return Math.max(0, Math.min(state.ref.segs.length - 1, idx));
   }
 
+  /** Which repetition of its phrase line k of the adhan is (1 or 2). */
+  function repOf(id, k) {
+    return K.adhanOrder(state.fajr).slice(0, k + 1).filter((x) => x === id).length || 1;
+  }
+
   function phraseTarget(phrase, lineIndex) {
+    if (state.level === 'rec' && state.rec) {
+      const t = state.rec.target(phrase.id, lineIndex == null ? 1 : repOf(phrase.id, lineIndex));
+      if (t) return t;
+    }
     if (state.level === 'ref' && state.ref) {
       const seg = state.ref.segs[refIndexFor(phrase.id, lineIndex)];
       if (seg) return C.targetFromContour(state.ref.frames, seg, state.ref.tonicHz, state.ref.shift * 100);
     }
-    const lvl = state.level === 'ref' ? 'simple' : state.level;
+    const lvl = state.level === 'steady' ? 'steady' : 'simple';
     return C.buildTarget(phrase, lvl);
   }
 
   function currentTarget() {
     if (state.full) {
-      const items = K.adhanOrder(state.fajr).map((id, k) => ({ name: lineLabel(id, k), target: phraseTarget(K.phraseById(id), k) }));
-      return C.buildSequence(items, 2.5);
+      state.items = K.adhanOrder(state.fajr).map((id, k) => ({ id, name: lineLabel(id, k), target: phraseTarget(K.phraseById(id), k) }));
+      return C.buildSequence(state.items, 2.5);
     }
+    state.items = null;
     return phraseTarget(K.phraseById(state.phraseId));
   }
 
@@ -231,9 +246,42 @@
     const lvl = K.LEVELS.find((l) => l.id === state.level);
     $('level-about').textContent =
       state.level === 'ref'
-        ? 'The melody of your uploaded recording, moved to your home note.'
+        ? 'Your uploaded recording. Listen plays its voice; the ribbon is its melody moved to your home note.'
         : lvl.about;
+    renderVoiceControls();
     setCue(idleCue());
+  }
+
+  /** Voice-or-hum labels, the pitch switch, and the recording's credit. */
+  function renderVoiceControls() {
+    const voice = isVoice();
+    $('listen-label').textContent = voice ? 'Listen to the adhan' : 'Listen to the hum guide';
+    $('pitch-row').hidden = !voice;
+    $('rec-status').textContent = state.rec
+      ? `Recorded adhan: ${state.rec.credit()}`
+      : 'Recorded adhan: no recording has been added to this copy yet. Upload one under "Learn from a recording".';
+    $('rec-status').hidden = state.level !== 'rec' && !!state.rec;
+    document.querySelectorAll('input[name="voice-pitch"]').forEach((r) => (r.checked = r.value === state.pitchMode));
+    if (!voice) return;
+    const cents = voiceShift();
+    const n = Math.round(Math.abs(cents) / 100);
+    $('pitch-note').textContent =
+      state.pitchMode === 'mine'
+        ? n === 0
+          ? 'This voice already sits at your note.'
+          : `Moved ${n} semitone${n === 1 ? '' : 's'} ${cents < 0 ? 'down' : 'up'} to your note.${n >= 5 ? ' Large moves change the voice\'s character.' : ''}`
+        : 'As recorded. Your ribbon stays at your note.';
+  }
+
+  function isVoice() {
+    return (state.level === 'rec' && !!state.rec) || (state.level === 'ref' && !!state.ref);
+  }
+
+  /** Cents to move the real voice so it rests on the user's note. */
+  function voiceShift() {
+    if (state.level === 'rec' && state.rec) return R.shiftToNote(state.rec.tonicHz, state.tonic);
+    if (state.level === 'ref' && state.ref) return R.shiftToNote(state.ref.tonicHz, state.tonic, state.ref.shift * 100);
+    return 0;
   }
 
   function idleCue() {
@@ -375,21 +423,78 @@
     return p && Math.abs(p.t - t) < 0.05 ? p.c : null;
   }
 
+  /**
+   * What to play for the real voice: one entry per line, each either a
+   * buffer (with an offset into it) or, for a line the recording lacks,
+   * a target to hum. `at` is the line's start on the lane's clock.
+   */
+  async function voiceParts() {
+    const order = K.adhanOrder(state.fajr);
+    const mine = state.pitchMode === 'mine';
+    const cents = mine ? voiceShift() : 0;
+    const entries = state.full
+      ? order.map((id, k) => ({ id, k, at: state.target.starts[k], target: state.items[k].target }))
+      : [{ id: state.phraseId, k: null, at: 0, target: state.target }];
+    const parts = [];
+    for (const [i, e] of entries.entries()) {
+      if (mine && Math.abs(cents) >= 15) setCue(`Moving the voice to your note… ${i + 1} of ${entries.length}`);
+      if (state.level === 'rec') {
+        const line = state.rec.line(e.id, e.k == null ? 1 : repOf(e.id, e.k));
+        if (!line) parts.push({ at: e.at, hum: e.target });
+        else parts.push({ at: e.at, buffer: await state.rec.clipAt(line, cents), cents });
+      } else {
+        const src = e.target.source;
+        const key = `ref|${src.t0.toFixed(2)}|${src.t1.toFixed(2)}`;
+        if (mine && Math.abs(cents) >= 15) {
+          const buf = await R.shifted(engine, () => R.slice(engine, state.ref.buffer, src.t0, src.t1), cents, state.ref.cache, key);
+          parts.push({ at: e.at, buffer: buf, cents });
+        } else {
+          parts.push({ at: e.at, buffer: state.ref.buffer, offset: src.t0, duration: e.target.dur, cents: 0 });
+        }
+      }
+    }
+    return parts;
+  }
+
   async function listen() {
     await engine.ensure();
     const target = state.target;
+    const voice = isVoice();
+    let parts = [];
+    if (voice) {
+      setBusy(true);
+      setCue('Getting the recording ready…');
+      try {
+        parts = await voiceParts();
+      } catch (e) {
+        setBusy(false);
+        setCue('The recording couldn\'t be loaded. Try again, or switch to a hum-guide level.');
+        return;
+      }
+      setBusy(false);
+    }
     const lead = 1.2;
     const t0 = engine.ctx.currentTime + lead;
-    if (state.level === 'ref' && state.ref && !state.full && target.source) {
-      engine.play(state.ref.buffer, { offset: target.source.t0, duration: target.dur, when: t0, throughSpace: false });
-      setCue('The original recording. Your ribbon is moved to your note.');
+    if (voice) {
+      for (const p of parts) {
+        if (p.buffer) engine.play(p.buffer, { offset: p.offset || 0, duration: p.duration, when: t0 + p.at, throughSpace: false });
+        else engine.guide(p.hum, state.tonic, t0 + p.at);
+      }
+      const n = Math.round(Math.abs(voiceShift()) / 100);
+      setCue(
+        state.pitchMode === 'mine' && n > 0
+          ? `The real voice, moved ${n} semitone${n === 1 ? '' : 's'} to your note. Follow the ring.`
+          : 'The real voice, as recorded. Your ribbon is at your note. Follow the ring.'
+      );
     } else {
       engine.guide(target, state.tonic, t0);
-      setCue('Listen to the shape. Follow the ring along the ribbon.');
+      setCue('A hummed guide to the shape. Say the words in your head and follow the ring.');
     }
+    lastListen = { kind: voice ? 'voice' : 'hum', parts: parts.map((p) => ({ at: p.at, seconds: p.buffer ? (p.duration || p.buffer.duration) : null, cents: p.cents || 0, hum: !!p.hum })) };
     lane.setTrack([]);
     startRun({ t0, end: target.dur + 0.4, view: () => ({ guide: true }), done: () => setCue('Now it\'s your turn.') });
   }
+  let lastListen = null;
 
   async function sing() {
     if (state.micState === 'blocked') {
@@ -605,6 +710,13 @@
       refreshTarget();
     });
   });
+  document.querySelectorAll('input[name="voice-pitch"]').forEach((r) => {
+    r.addEventListener('change', () => {
+      state.pitchMode = r.value;
+      store.set('pitchMode', r.value);
+      renderVoiceControls();
+    });
+  });
   document.querySelectorAll('input[name="band"]').forEach((r) => {
     r.checked = r.value === state.band;
     r.addEventListener('change', () => {
@@ -711,7 +823,7 @@
       const segs = P.segmentPhrases(frames, { minGap: 0.6, minLen: 1.0 });
       const tonicHz = P.estimateTonic(frames);
       if (!segs.length || !tonicHz) throw new Error('no phrases');
-      state.ref = { buffer, frames, segs, tonicHz, shift: 0, nudge: {}, name: file.name };
+      state.ref = { buffer, frames, segs, tonicHz, shift: 0, nudge: {}, name: file.name, cache: new Map() };
       $('level-ref').disabled = false;
       $('level-ref').checked = true;
       state.level = 'ref';
@@ -761,8 +873,8 @@
     state.ref = null;
     $('level-ref').disabled = true;
     if (state.level === 'ref') {
-      state.level = 'simple';
-      $('level-simple').checked = true;
+      state.level = state.rec ? 'rec' : 'simple';
+      $('level-' + state.level).checked = true;
     }
     $('ref-status').textContent = 'Recording removed.';
     refreshTarget();
@@ -838,6 +950,18 @@
   const hash = (location.hash || '').slice(1);
   if (SCREENS.includes(hash)) show(hash);
 
+  // The bundled real recording, when this copy has one.
+  R.RecordedAdhan.load(engine, 'reference/manifest.json').then((rec) => {
+    if (!rec) return;
+    state.rec = rec;
+    $('level-rec').disabled = false;
+    if (wantedLevel === 'rec') {
+      state.level = 'rec';
+      $('level-rec').checked = true;
+      refreshTarget();
+    } else renderVoiceControls();
+  });
+
   // Test hook: exposes internals for the automated browser check only.
-  window.__hayya = { state, engine, lane, show, refreshTarget };
+  window.__hayya = { state, engine, lane, show, refreshTarget, lastListen: () => lastListen };
 })();

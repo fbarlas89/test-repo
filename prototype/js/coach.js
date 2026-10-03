@@ -92,8 +92,8 @@
    * frames: [{t, hz}] from pitch.extractContour; seg: {t0, t1};
    * refTonicHz: the recording's home note; shift: extra cents.
    */
-  function targetFromContour(frames, seg, refTonicHz, shift) {
-    const pad = 0.15;
+  function targetFromContour(frames, seg, refTonicHz, shift, pad) {
+    pad = pad == null ? 0.15 : pad;
     const t0 = seg.t0 - pad;
     const dur = seg.t1 - seg.t0 + 2 * pad;
     const n = Math.round(dur / STEP) + 1;
@@ -130,6 +130,26 @@
     };
   }
 
+  /**
+   * Target from a stored contour: cents from the recording's home note
+   * every STEP seconds, null where the voice is silent. Used for the
+   * bundled reference recording, whose contour is traced ahead of time.
+   */
+  function targetFromCents(values, shift) {
+    const cents = Float32Array.from(values, (v) => (v == null ? NaN : v + (shift || 0)));
+    const vb = voicedBounds(cents);
+    return {
+      step: STEP,
+      dur: (cents.length - 1) * STEP,
+      cents,
+      syllables: [],
+      degrees: [0],
+      parts: thirds(vb.first, vb.last),
+      firstVoiced: vb.first,
+      lastVoiced: vb.last,
+    };
+  }
+
   function bridgeGaps(arr, maxGap) {
     const out = Float32Array.from(arr);
     let last = -1;
@@ -152,8 +172,10 @@
     const syllables = [];
     const parts = [];
     const breaths = [];
+    const starts = [];
     let t = 0;
     items.forEach((it, idx) => {
+      starts.push(t);
       const off = Math.round(t / STEP);
       it.target.cents.forEach((c, i) => {
         if (off + i < n) cents[off + i] = c;
@@ -175,6 +197,7 @@
       degrees: items[0] ? items[0].target.degrees : [0],
       parts,
       breaths,
+      starts,
       firstVoiced: vb.first,
       lastVoiced: vb.last,
     };
@@ -362,6 +385,7 @@
     BANDS,
     buildTarget,
     targetFromContour,
+    targetFromCents,
     buildSequence,
     targetAt,
     cueFor,
