@@ -1,0 +1,11 @@
+{
+  "name": "hayya-prototype",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Hayya: a private, intention-first adhan practice coach (prototype).",
+  "scripts": {
+    "start": "python3 -m http.server 8080",
+    "test": "node --test test/*.test.js",
+    "check:browser": "node test/browser-check.js"
+  }
+}
